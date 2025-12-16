@@ -15,7 +15,7 @@ class ProcessNbnApplications extends Command
     protected $signature = 'applications:process-nbn';
 
 
-    protected $description = 'Dispatch queued jobs to order all  NBN applications with status "order"';
+    protected $description = 'Dispatch queued jobs to order all NBN applications with status "order"';
 
 
     public function handle(): int
