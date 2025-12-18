@@ -8,6 +8,7 @@ This submission implements both required tasks using standard Laravel convention
 with a focus on clarity, test coverage, and safe handling of edge cases.
 
 All functionality is covered by feature tests and can be verified by running:
+- please rename .env.example to .env
 
 ```bash
 php artisan test
@@ -84,3 +85,4 @@ Given more time, the solution could be extended with:
 - request validation for query parameters
 - API resource classes for response formatting
 - retry/backoff strategies for failed B2B calls
+
