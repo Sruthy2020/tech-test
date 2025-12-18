@@ -1,4 +1,6 @@
 # AussieBroadband Laravel Tech Test: Implementation Notes
+- Forked Github: https://github.com/Sruthy2020/tech-test
+- Orginal Github: https://github.com/aussiebroadband/tech-test
 
 ## Overview
 
@@ -73,6 +75,9 @@ Feature tests cover:
 - The following packages were added only to support framework features used in testing:
      - fruitcake/laravel-cors (middleware dependency)
      - guzzlehttp/psr7 (required by Laravel HTTP client in the test environment)
+
+## Version Control Usage
+- I worked on both tasks using separate GitHub branches (task-1-list-applications and task-2-nbn-ordering) and merged them into main after completion.
 
 ## Notes
 Given more time, the solution could be extended with:
