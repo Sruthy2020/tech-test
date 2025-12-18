@@ -35,34 +35,45 @@ class ProcessNbnOrder implements ShouldQueue
         // making sure relationships are available for payload..
         $this->application->loadMissing('plan');
 
-        try {
-            $response = Http::post(config('services.nbn.endpoint'), [
-                'address_1' => $this->application->address_1,
-                'address_2' => $this->application->address_2,
-                'city' => $this->application->city,
-                'state' => $this->application->state,
-                'postcode' => $this->application->postcode,
-                'plan_name' => $this->application->plan->name,
-            ]);
-            
-            // if successful response with order id, update application..
-            if ($response->successful() && isset($response['order_id'])) {
-                $this->application->forceFill([
-                    'order_id' => (string) $response['order_id'],
-                    'status' => ApplicationStatus::Complete,
-                ])->save();
-
-                return;
-            }
-
-            // if response not successful, mark as failed..
-            $this->application->forceFill([
-                'status' => ApplicationStatus::OrderFailed,
-            ])->save();
-        } catch (Throwable $e) {
-            $this->application->forceFill([
-                'status' => ApplicationStatus::OrderFailed,
-            ])->save();
+        $endpoint = config('services.nbn.endpoint');
+        if (!is_string($endpoint) || trim($endpoint) === '') {
+            $this->application->forceFill(['status' => ApplicationStatus::OrderFailed])->save();
+            return;
         }
+
+        $planName = $this->application->plan?->name;
+        if (!is_string($planName) || trim($planName) === '') {
+            $this->application->forceFill(['status' => ApplicationStatus::OrderFailed])->save();
+            return;
+        }
+
+        $response = Http::post($endpoint, [
+            'address_1' => $this->application->address_1,
+            'address_2' => $this->application->address_2,
+            'city'      => $this->application->city,
+            'state'     => $this->application->state,
+            'postcode'  => $this->application->postcode,
+            'plan_name' => $planName,
+        ]);
+
+        $body = $response->json() ?? [];
+
+        $orderId = $body['order_id'] ?? $body['id'] ?? null;
+        $status  = $body['status'] ?? null;
+
+        // if successful response with order id, update application..
+        if ($response->successful() && filled($orderId) && is_string($status) && strcasecmp($status, 'Successful') === 0) {
+            $this->application->forceFill([
+                'order_id' => (string) $orderId,
+                'status'   => ApplicationStatus::Complete,
+            ])->save();
+            return;
+        }
+
+        // if response not successful, mark as failed..
+        $this->application->forceFill([
+            'status' => ApplicationStatus::OrderFailed,
+        ])->save();
     }
 }
+//in a real environment we would wrap this call in a try/catch to handle transport level failures (timeouts, DNS, etc).
