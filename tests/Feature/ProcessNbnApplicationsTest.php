@@ -17,47 +17,60 @@ class ProcessNbnApplicationsTest extends TestCase
 
     public function test_command_dispatches_jobs_for_nbn_applications(): void
     {
-        //prevent jobs from actually running and allow assertions on dispatches....
+        //fake the queue so jobs don’t actually run during this test..
         Queue::fake();
 
-        //create plans for different types..
+        //create a couple of plans so we can test eligibility rules..
         $nbnPlan    = Plan::factory()->create(['type' => 'nbn']);
         $mobilePlan = Plan::factory()->create(['type' => 'mobile']);
 
-        //eligible application:
-        // - NBN plan
-        // - status = order
+        //this one should be picked up (nbn + order)..
         $eligible = Application::factory()->create([
             'plan_id' => $nbnPlan->id,
             'status'  => ApplicationStatus::Order,
         ]);
 
-        //Ineligible application:
-        // - NBN plan
-        // - Status not "order"
+        //this one should be ignored (nbn but not in order status)..
         Application::factory()->create([
             'plan_id' => $nbnPlan->id,
             'status'  => ApplicationStatus::Prelim,
         ]);
 
-        // Ineligible application:
-        // - Non-NBN plan
-        // - Status = order
+        //this one should be ignored (order status but not nbn)..
         Application::factory()->create([
             'plan_id' => $mobilePlan->id,
             'status'  => ApplicationStatus::Order,
         ]);
 
-        //run the console command that processes NBN applications
+        //run the command..
         Artisan::call('applications:process-nbn');
 
-        //assert that a ProcessNbnOrder job was dispatched
-        // and that it was dispatched for the eligible application only
+        //confirm we dispatched a job for the eligible one only..
         Queue::assertPushed(ProcessNbnOrder::class, function (ProcessNbnOrder $job) use ($eligible) {
             return $job->application->id === $eligible->id;
         });
 
-        //ensure exactly one job was dispatched
+        //and confirm it only happened once..
         Queue::assertPushed(ProcessNbnOrder::class, 1);
+    }
+
+
+    
+    public function test_command_dispatches_no_jobs_when_no_eligible_applications_exist(): void
+    {
+        Queue::fake();
+
+        //create nbn apps that are not in order status..
+        $nbnPlan = Plan::factory()->create(['type' => 'nbn']);
+
+        Application::factory()->create([
+            'plan_id' => $nbnPlan->id,
+            'status'  => ApplicationStatus::Prelim,
+        ]);
+
+        Artisan::call('applications:process-nbn');
+
+        //nothing should be queued because nothing matched the rules..
+        Queue::assertNothingPushed();
     }
 }
