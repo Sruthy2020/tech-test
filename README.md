@@ -1,29 +1,59 @@
-# What i implemented
-## Task 1: list applications endpoint
+# AussieBroadband Laravel Tech Test: Implementation Notes
 
-- added a new authenticated endpoint: GET /api/applications.
-- supports optional filter: ?plan_type=nbn|opticomm|mobile.
-- returns only the required fields:
-   - application id.
-   - customer full name.
-   - address fields.
-   - plan type, plan name, state.
-   - monthly cost converted from cents to dollars.
-   - order id only when status is complete.
-- results are ordered oldest first.
-- results are paginated for scalability.
+## Overview
+
+This submission implements both required tasks using standard Laravel conventions,
+with a focus on clarity, test coverage, and safe handling of edge cases.
+
+All functionality is covered by feature tests and can be verified by running:
+
+```bash
+php artisan test
+```
+
+## Task 1: list applications endpoint
+A new authenticated API endpoint (/api/applications) was added to list applications
+for internal use.
+
+### Features
+- only accessible to authenticated users
+- optional plan_type filter (nbn, mobile, opticomm)
+- results are ordered oldest first
+- response is paginated for scalability
+- plan monthly cost is converted from cents to a dollar format
+- order id is only included when application status is complete
+
+### Testing
+Feature tests verify:
+- authentication requirements
+- correct ordering
+- correct field visibility
+- plan type filtering
+- pagination behaviour
 
 ## Task 2: automate ordering for nbn applications
-- added a console command: applications:process-nbn.
-- the command selects only:
-   - applications with status order.
-   - applications whose plan type is nbn.
-- dispatches a queued job per application: ProcessNbnOrder.
-- the job:
-   - posts required payload to the configured b2b endpoint.
-   - marks the application complete and stores order_id on success.
-   - marks the application order failed on failed response or errors.
-- schedule runs every five minutes in App\Console\Kernel.
+A scheduled console command processes NBN applications that are ready to be ordered.
+### Behaviour
+- runs every 5 minutes
+- selects only nbn applications with status order
+- dispatches one queue job per eligible application
+- sends application and plan details to the B2B endpoint
+- updates application status based on response outcome
+
+### Error Handling
+Applications are marked as order failed if:
+- the endpoint is missing
+- the HTTP request fails
+- the response is not successful
+- the response is missing an order id
+- the response status is not Successful
+
+### Testing
+Feature tests cover:
+- correct job dispatching
+- no dispatch when no eligible applications exist
+- successful and failed order flows
+- all major edge cases
 
 ## Testing approach
 - application list endpoint is covered with feature tests:
@@ -38,7 +68,14 @@
    - job marks order failed on failure.
    - edge cases: missing endpoint, wrong status, missing order id, non success status.
 
-## Notes about packages
-- added fruitcake/laravel-cors because the project referenced the cors middleware and it was missing in this environment.
-- added the minimal guzzle dependency required for Laravel’s Http client to run in tests (to avoid the HandlerStack missing error).
-- no runtime http calls are made in tests; all calls are faked using Http::fake() as required.
+## Packages
+- No additional packages were required for core functionality.
+- The following packages were added only to support framework features used in testing:
+     - fruitcake/laravel-cors (middleware dependency)
+     - guzzlehttp/psr7 (required by Laravel HTTP client in the test environment)
+
+## Notes
+Given more time, the solution could be extended with:
+- request validation for query parameters
+- API resource classes for response formatting
+- retry/backoff strategies for failed B2B calls
