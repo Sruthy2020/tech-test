@@ -1,74 +1,44 @@
-# Overview
+# What i implemented
+## Task 1: list applications endpoint
 
-Welcome to the AussieBroadband Software Engineering Laravel Tech Test.
+- added a new authenticated endpoint: GET /api/applications.
+- supports optional filter: ?plan_type=nbn|opticomm|mobile.
+- returns only the required fields:
+   - application id.
+   - customer full name.
+   - address fields.
+   - plan type, plan name, state.
+   - monthly cost converted from cents to dollars.
+   - order id only when status is complete.
+- results are ordered oldest first.
+- results are paginated for scalability.
 
-This repository contains a Laravel 10 installation and requires at least php@8.1 and composer installed.
+## Task 2: automate ordering for nbn applications
+- added a console command: applications:process-nbn.
+- the command selects only:
+   - applications with status order.
+   - applications whose plan type is nbn.
+- dispatches a queued job per application: ProcessNbnOrder.
+- the job:
+   - posts required payload to the configured b2b endpoint.
+   - marks the application complete and stores order_id on success.
+   - marks the application order failed on failed response or errors.
+- schedule runs every five minutes in App\Console\Kernel.
 
-Start by cloning/forking this repo, copy `.env.example` to `.env` and run `composer install` to get started.
+## Testing approach
+- application list endpoint is covered with feature tests:
+   - validates oldest first ordering.
+   - validates plan_type filtering.
+   - validates order_id visibility only for completed applications.
+   - validates cents -> dollars formatting.
+   - validates pagination behaviour.
+- ordering flow is covered with feature tests:
+   - command only dispatches jobs for eligible applications.
+   - job marks complete and stores order id on success.
+   - job marks order failed on failure.
+   - edge cases: missing endpoint, wrong status, missing order id, non success status.
 
-An in memory sqlite database is already configured for testing.
-
-Should you wish to spin up an environment to suit your workflow during development, you are completely free to do so, however keep in mind that solutions will be evaluated on the tests you write, no additional setup should be required for `php artisan test` to be executed.
-
-## The Tasks
-
-We are mindful of your time and the tasks below are overly simplified to accommodate various valid solutions. Your solutions will be evaluated on your use of tests as well as your implementation and understanding of Laravel conventions, you do not need to "impress" us with everthing you know or coding "clever" solutions. Work with the structure provided and feel free to get in touch if there are any gaps.
-
-If you feel you would approach any of these tasks differently given more time, please provide this as part of your submission.
-
-If you have any questions before you start any of these tasks, please email tech-test@aussiebb.com.au.
-
-### Task 1 - Expose a new api endpoint to list all applications
-
-We need to expose a new internal api endpoint to list all applications in the system and should accept an optional plan type filter `(null, nbn, opticomm, mobile)` for user experience. This endpoint will exist only for authenticated users and will be consumed by an SPA frontend.
-
-As part of exposing these details we only want to provide the following data:
-- Application id
-- Customer full name
-- Address
-- Plan type
-- Plan name
-- State
-- Plan monthly cost
-- Order Id (only show this field on applications with the `complete` status)
-
-The following must also be observed
-- The data returned should be paginated for scalability.
-- The oldest applications must be at the top of the list.
-- Plan monthly cost is stored as cents in the database, this must be displayed in human readable dollar format.
-
-***NOTE:*** You are not required to implement any additional auth features/tests, and you can assume any/all auth associated tests are already done. You are also not required to build out the frontend as part of this task.
-
-### Task 2 - Automate the ordering of all nbn applications
-
-Once received and all internal business rules have been satisfied an application will move to a status of `order` (out of scope for this task).
-
-Applications with this status can be ordered via the appropriate B2B integration for the plan type and if successful will continue through the processes. For this task, you will be required to identify and process any `nbn` application with the following business logic:
-- a. Must pick up and process `nbn` applications every 5 minutes.
-- b. Only applications with the status `order` should be processed.
-- c. Each application must be processed on a queue (assume queue worker is configured).
-- d. Must store the Order Id on the application and progress to a `complete` status if successful.
-- e. Progress to `order failed` status in the event of a failed order or error.
-
-You are required to send a `Http::post` request to the B2B endpoint (an `NBN_B2B_ENDPOINT` environment variable exists for this purpose) with the following application and plan details:
-- address_1
-- address_2
-- city
-- state
-- postcode
-- plan name
-
-***NOTE:*** You should not send any actual http requests as part of this task, a sample successful and failure response can be found in `test\stubs\nbn-successful-response.json` and `test\stubs\nbn-fail-response.json`.
-
-***NOTE:*** B2B = business to business api
-
-## Submissions
-
-Your solutions must be submitted by emailing a zip/tarball (without the vendor dir and preserving git history) to 
-tech-test@aussiebb.com.au.
-
-You should not require any additional packages to complete these tasks, if you do decide to add additional packages please specify your reasoning to do so in your submission.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Notes about packages
+- added fruitcake/laravel-cors because the project referenced the cors middleware and it was missing in this environment.
+- added the minimal guzzle dependency required for Laravel’s Http client to run in tests (to avoid the HandlerStack missing error).
+- no runtime http calls are made in tests; all calls are faked using Http::fake() as required.
